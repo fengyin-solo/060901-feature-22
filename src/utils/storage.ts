@@ -2,10 +2,21 @@ import type { Room } from '@/types'
 
 const STORAGE_KEY = 'party_topic_bag_rooms'
 
+function migrateRooms(rooms: Room[]): Room[] {
+  return rooms.map(room => ({
+    ...room,
+    topics: room.topics.map(topic => ({
+      hiddenBeforeStart: false,
+      ...topic
+    }))
+  }))
+}
+
 export function getRooms(): Room[] {
   try {
     const data = localStorage.getItem(STORAGE_KEY)
-    return data ? JSON.parse(data) : []
+    const rooms = data ? JSON.parse(data) : []
+    return migrateRooms(rooms)
   } catch {
     return []
   }

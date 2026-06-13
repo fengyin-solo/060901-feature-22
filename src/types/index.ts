@@ -19,6 +19,7 @@ export interface Topic {
   author: string
   isAnonymous: boolean
   isFlipped: boolean
+  hiddenBeforeStart: boolean
   createdAt: string
   color: string
 }

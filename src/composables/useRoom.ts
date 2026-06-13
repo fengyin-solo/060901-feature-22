@@ -93,7 +93,8 @@ export function useRoom() {
     content: string, 
     type: TopicType, 
     author: string,
-    isAnonymous: boolean = false
+    isAnonymous: boolean = false,
+    hiddenBeforeStart: boolean = false
   ): Topic | null => {
     const room = getRoomById(roomId)
     if (!room) return null
@@ -106,6 +107,7 @@ export function useRoom() {
       author,
       isAnonymous,
       isFlipped: false,
+      hiddenBeforeStart,
       createdAt: new Date().toISOString(),
       color: TOPIC_COLORS[type]
     }
@@ -119,6 +121,24 @@ export function useRoom() {
     loadRooms()
     
     return topic
+  }
+
+  const toggleTopicVisibility = (roomId: string, topicId: string): boolean => {
+    const room = getRoomById(roomId)
+    if (!room) return false
+
+    const topic = room.topics.find(t => t.id === topicId)
+    if (topic) {
+      topic.hiddenBeforeStart = !topic.hiddenBeforeStart
+      saveRoom(room)
+      
+      if (currentRoom.value?.id === roomId) {
+        currentRoom.value = room
+      }
+      loadRooms()
+    }
+    
+    return true
   }
 
   const removeTopic = (roomId: string, topicId: string): boolean => {
@@ -218,6 +238,7 @@ export function useRoom() {
     loadRoom,
     addTopic,
     removeTopic,
+    toggleTopicVisibility,
     startGame,
     endGame,
     resetGame,

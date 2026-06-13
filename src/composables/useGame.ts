@@ -75,6 +75,7 @@ export function useGame() {
         author: '急救箱',
         isAnonymous: true,
         isFlipped: true,
+        hiddenBeforeStart: false,
         createdAt: new Date().toISOString(),
         color: '#FFD93D'
       }

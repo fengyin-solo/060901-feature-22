@@ -12,18 +12,32 @@ import { copyToClipboard, getDaysRemaining } from '@/utils/helpers'
 
 const route = useRoute()
 const router = useRouter()
-const { loadRoom, currentRoom, addTopic, removeTopic, startGame, error, loadRooms } = useRoom()
+const { loadRoom, currentRoom, addTopic, removeTopic, startGame, error, loadRooms, toggleTopicVisibility } = useRoom()
 const { isRoomExpired, getExpirationWarning } = useExpire()
 
 const topicContent = ref('')
 const selectedType = ref<TopicType>('trouble')
 const isAnonymous = ref(false)
+const hiddenBeforeStart = ref(false)
 const authorName = ref('')
 const showAddTopic = ref(false)
 const copySuccess = ref(false)
 const selectedTemplate = ref<TopicTemplate | null>(null)
 
 const roomId = computed(() => route.params.id as string)
+
+const isHost = computed(() => {
+  if (!currentRoom.value || !currentRoom.value.members.length) return false
+  const hostMember = currentRoom.value.members.find(m => m.isHost)
+  if (!hostMember) return false
+  return hostMember.name === authorName.value
+})
+
+const isContentHidden = computed(() => {
+  if (!currentRoom.value) return false
+  if (currentRoom.value.status !== 'preparing') return false
+  return !isHost.value
+})
 
 const unflippedTopics = computed(() => 
   currentRoom.value?.topics.filter((t: Topic) => !t.isFlipped) || []
@@ -86,11 +100,13 @@ const handleAddTopic = () => {
     topicContent.value.trim(),
     selectedType.value,
     authorName.value || '匿名',
-    isAnonymous.value
+    isAnonymous.value,
+    isHost.value ? hiddenBeforeStart.value : false
   )
   
   topicContent.value = ''
   isAnonymous.value = false
+  hiddenBeforeStart.value = false
   showAddTopic.value = false
 }
 
@@ -98,6 +114,10 @@ const handleDeleteTopic = (topicId: string) => {
   if (confirm('确定要删除这个话题吗？')) {
     removeTopic(roomId.value, topicId)
   }
+}
+
+const handleToggleVisibility = (topicId: string) => {
+  toggleTopicVisibility(roomId.value, topicId)
 }
 
 const handleCopyCode = () => {
@@ -206,6 +226,28 @@ const goToGame = () => {
           </div>
         </div>
 
+        <div 
+          v-if="currentRoom.status === 'preparing' && unflippedTopics.some(t => t.hiddenBeforeStart)"
+          class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm"
+        >
+          <div v-if="isHost" class="text-amber-800 flex items-center gap-2">
+            <span>🎁</span>
+            <span>你设置了 <strong>{{ unflippedTopics.filter(t => t.hiddenBeforeStart).length }}</strong> 个惊喜话题，开局后才会对所有人揭晓～</span>
+          </div>
+          <div v-else class="text-amber-800 flex items-center gap-2">
+            <span>🎁</span>
+            <span>有 <strong>{{ unflippedTopics.filter(t => t.hiddenBeforeStart).length }}</strong> 个惊喜话题等待开局后揭晓，敬请期待！</span>
+          </div>
+        </div>
+
+        <div 
+          v-if="currentRoom.status === 'preparing' && isHost"
+          class="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-xl text-sm text-purple-800 flex items-center gap-2"
+        >
+          <span>💡</span>
+          <span>小提示：作为房主，你可以把鼠标悬停在话题卡片右上角，点击 🙈 将话题设为惊喜话题（开局后才可见）</span>
+        </div>
+
         <div v-if="currentRoom.status === 'preparing'" class="flex gap-3">
           <button 
             class="flex-1 px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -249,8 +291,12 @@ const goToGame = () => {
             v-for="topic in unflippedTopics" 
             :key="topic.id"
             :topic="topic"
-            :can-delete="currentRoom.status === 'preparing'"
+            :can-delete="currentRoom.status === 'preparing' && (isHost || (!topic.isAnonymous && topic.author === authorName))"
+            :is-host="isHost"
+            :room-status="currentRoom.status"
+            :is-content-hidden="isContentHidden"
             @delete="handleDeleteTopic(topic.id)"
+            @toggle-visibility="handleToggleVisibility(topic.id)"
           />
         </div>
       </div>
@@ -264,6 +310,9 @@ const goToGame = () => {
             v-for="topic in flippedTopics" 
             :key="topic.id"
             :topic="topic"
+            :is-host="isHost"
+            :room-status="currentRoom.status"
+            :is-content-hidden="false"
           />
         </div>
       </div>
@@ -357,6 +406,17 @@ const goToGame = () => {
               class="w-4 h-4 rounded text-purple-500 focus:ring-purple-400"
             />
             <span class="text-sm text-gray-600">🎭 匿名发布</span>
+          </label>
+        </div>
+
+        <div v-if="isHost && currentRoom.status === 'preparing'" class="mb-6">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input 
+              v-model="hiddenBeforeStart"
+              type="checkbox" 
+              class="w-4 h-4 rounded text-amber-500 focus:ring-amber-400"
+            />
+            <span class="text-sm text-gray-600">🎁 仅开局后可见（惊喜话题，避免剧透）</span>
           </label>
         </div>
 
